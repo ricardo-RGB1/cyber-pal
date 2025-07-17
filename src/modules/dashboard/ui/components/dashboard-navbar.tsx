@@ -24,6 +24,7 @@ export const DashboardNavbar = () => {
 
   return (
     <> 
+    {/* command dialog when user clicks on the search button */}
     <DashboardCommandDialog open={commandOpen} setOpen={setCommandOpen} />
     <nav className="flex px-4 gap-x-2 items-center py-3 border-b bg-background">
       <Button

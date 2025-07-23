@@ -1,33 +1,16 @@
-import { z } from 'zod';
-import { baseProcedure, createTRPCRouter } from '../init';
+import { createTRPCRouter } from '../init';
+import { agentsRouter } from '@/modules/agents/server/procedures';
 
 
 
+// The main application router for tRPC.
+// This router defines all available API endpoints for the app.
 
-/**
- * The main application router for tRPC.
- * 
- * This router defines all available API endpoints for the app.
- * 
- * Endpoints:
- * - hello: Accepts an object with a `text` string, and returns a greeting message.
- *   - Input: { text: string }
- *   - Output: { greeting: string }
- */
 export const appRouter = createTRPCRouter({
-// one endpoint  called hello that accepts an object with a text string and returns a greeting message. 
-// input: { text: string }
-// output: { greeting: string }
-  hello: baseProcedure
-    .input(
-      z.object({
-        text: z.string(),
-      }),
-    )
-    .query((opts) => {
-      return {
-        greeting: `hello ${opts.input.text}`,
-      };
-    }),
+  // The agents router is a key that maps to the agentsRouter object, which contains all the procedures for the agents module.
+  agents: agentsRouter,
 });
+
 export type AppRouter = typeof appRouter;
+
+// The AppRouter type is a union of all the routers in the app

@@ -11,12 +11,11 @@ const Page = async () => {
     headers: await headers(), 
   }); 
 
-  // if the user is not logged in, redirect to the sign-in page 
   if (!session) {
     redirect("/sign-in"); 
   }
 
-  // if the user is not logged in, show the home view 
+  // if the user is logged in, show the home view 
   return (
     <HomeView />
   )

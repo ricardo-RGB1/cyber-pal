@@ -42,7 +42,7 @@ export const AgentForm = ({ onSuccess, onCancel, initialValues }: Props) => {
     trpc.agents.createAgent.mutationOptions({
       onSuccess: async () => { 
         await queryClient.invalidateQueries(
-          trpc.agents.getAllAgents.queryOptions()
+          trpc.agents.getAllAgents.queryOptions({})
         ); // This is to invalidate the cache of the agents LIST so that the new agent is displayed immediately 
 
         if (initialValues?.id) {
@@ -73,11 +73,13 @@ export const AgentForm = ({ onSuccess, onCancel, initialValues }: Props) => {
   const isEdit = !!initialValues?.id; 
   const isPending = createAgent.isPending;
 
+
+
   const onSubmit = (values: AgentFormData) => {
     if (isEdit) {
       console.log("TODO: Update agent");
     } else {
-      createAgent.mutate(values);
+      createAgent.mutate(values); // This is to create a new agent when the form is submitted 
     }
   };
 

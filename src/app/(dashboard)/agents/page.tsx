@@ -7,9 +7,20 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { Suspense } from "react";
+import { SearchParams } from "nuqs";
+import { loadSearchFilters } from "@/modules/agents/params";
 
 
-const AgentsPage = async () => {
+
+interface AgentsPageProps {
+  searchParams: Promise<SearchParams>
+}
+
+
+const AgentsPage = async ({searchParams}: AgentsPageProps) => {
+  // load the search params from the url - this will help us to synchronize the server and client components
+  const filters = await loadSearchFilters(searchParams); 
+
   // check if the user is logged in using server-side session 
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -20,8 +31,9 @@ const AgentsPage = async () => {
   }
 
   const queryClient = getQueryClient(); 
-  void queryClient.prefetchQuery(trpc.agents.getAllAgents.queryOptions()); 
-
+  void queryClient.prefetchQuery(trpc.agents.getAllAgents.queryOptions({
+    ...filters, 
+  })); 
 
   return (
     <>
@@ -32,7 +44,7 @@ const AgentsPage = async () => {
       </Suspense>
     </HydrationBoundary>
     </>
-  );
+   );
 };
 
 export default AgentsPage;

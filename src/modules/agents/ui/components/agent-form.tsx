@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { agentsInsertSchema } from "../../schemas";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+
 import {
   Form,
   FormControl,
@@ -37,9 +38,9 @@ export const AgentForm = ({ onSuccess, onCancel, initialValues }: Props) => {
   const queryClient = useQueryClient();
 
 
-  // This is the mutation to create an agent 
-  const createAgent = useMutation(
-    trpc.agents.createAgent.mutationOptions({
+    // This is the mutation to create an agent 
+  const updateAgent = useMutation(
+    trpc.agents.update.mutationOptions({
       onSuccess: async () => { 
         await queryClient.invalidateQueries(
           trpc.agents.getAllAgents.queryOptions({})
@@ -61,6 +62,26 @@ export const AgentForm = ({ onSuccess, onCancel, initialValues }: Props) => {
     })
   );
 
+
+  const createAgent = useMutation(
+    trpc.agents.createAgent.mutationOptions({
+      onSuccess: async () => { 
+        await queryClient.invalidateQueries(
+          trpc.agents.getAllAgents.queryOptions({})
+        ); // This is to invalidate the cache of the agents LIST so that the new agent is displayed immediately 
+
+       // TODO: Invalidate free tier usage 
+
+        onSuccess?.(); 
+      },
+      onError: (error) => {
+        toast.error(error.message);
+
+        // TODO: Check if error code is 'FORBIDDEN' and if so, redirect to /upgrade
+      },
+    })
+  );
+
   const form = useForm<AgentFormData>({
     resolver: zodResolver(agentsInsertSchema),
     defaultValues: {
@@ -71,13 +92,18 @@ export const AgentForm = ({ onSuccess, onCancel, initialValues }: Props) => {
 
   // If the initialValues has an id (a truthy value), then we are editing an existing agent
   const isEdit = !!initialValues?.id; 
-  const isPending = createAgent.isPending;
+
+  // This is to check if the agent is being created or updated 
+  const isPending = createAgent.isPending || updateAgent.isPending; 
 
 
 
   const onSubmit = (values: AgentFormData) => {
-    if (isEdit) {
-      console.log("TODO: Update agent");
+    if (isEdit) { 
+      updateAgent.mutate({ // This is to update an existing agent when the form is submitted 
+        ...values,
+        id: initialValues.id,
+      }); 
     } else {
       createAgent.mutate(values); // This is to create a new agent when the form is submitted 
     }

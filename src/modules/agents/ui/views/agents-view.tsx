@@ -8,13 +8,14 @@ import { columns } from "../components/columns"
 import { EmptyState } from "@/components/empty-state";
 import { useAgentsFilters } from "../../hooks/use-agents-filters";
 import { DataPagination } from "../components/data-pagination";
+import { useRouter } from "next/navigation";
 
 
 
 
 
 export const AgentsView = () => {
-
+  const router = useRouter(); 
   const [filters, setFilters] = useAgentsFilters(); 
   const trpc = useTRPC();
   const { data } = useSuspenseQuery(trpc.agents.getAllAgents.queryOptions({
@@ -25,8 +26,8 @@ export const AgentsView = () => {
     <div className="flex-1 pb-4 px-4 md:px-8 flex flex-col gap-y-4">
       {data.items.length === 0 ? (
         <EmptyState title="No agents found" description="Create an agent to get started" />
-      ) : (
-        <DataTable columns={columns} data={data.items} />
+      ) : (  
+        <DataTable columns={columns} data={data.items} onRowClick={(row) => router.push(`/agents/${row.id}`)} />
       )}
       <DataPagination 
         page={filters.page} 
@@ -45,3 +46,4 @@ export const AgentsViewLoading = () => {
     />
 );
 };
+

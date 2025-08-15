@@ -31,6 +31,9 @@ const firstSection = [
     href: "/agents",
   },
 ];
+
+
+
 const secondSection = [
   {
     icon: StarIcon,
@@ -57,6 +60,7 @@ export const DashboardSidebar = () => {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
+              {/* First Section */}
               {firstSection.map((item) => (
                 <SidebarMenuItem key={item.label}>
                   <SidebarMenuButton
@@ -85,6 +89,7 @@ export const DashboardSidebar = () => {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
+              {/* Second Section */}
               {secondSection.map((item) => (
                 <SidebarMenuItem key={item.label}>
                   <SidebarMenuButton

@@ -1,10 +1,10 @@
-import { auth } from "@/lib/auth";
 import { AgentsListHeader } from "@/modules/agents/ui/components/agents-list-header";
 import { AgentsView, AgentsViewLoading } from "@/modules/agents/ui/views/agents-view";
 import { trpc, getQueryClient } from "@/trpc/server";  
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
 
 import { Suspense } from "react";
 import { SearchParams } from "nuqs";

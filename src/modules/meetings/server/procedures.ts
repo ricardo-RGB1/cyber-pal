@@ -1,8 +1,8 @@
 import { db } from "@/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { meetings } from "@/db/schema";
+import { agents, meetings } from "@/db/schema";
 import { z } from "zod";
-import { and, count, desc, eq, getTableColumns, ilike, min } from "drizzle-orm";
+import { and, count, desc, eq, getTableColumns, ilike, min, sql } from "drizzle-orm";
 import {
   DEFAULT_PAGE,
   DEFAULT_PAGE_SIZE,
@@ -84,6 +84,9 @@ export const meetingsRouter = createTRPCRouter({
       return existingMeeting;
     }),
 
+
+
+
   /**
    * Retrieves a paginated list of meetings for the authenticated user.
    *
@@ -118,9 +121,12 @@ export const meetingsRouter = createTRPCRouter({
       // get the meetings the user created
       const data = await db
         .select({
-          ...getTableColumns(meetings),
+          ...getTableColumns(meetings), // get all the columns from the meetings table from the db
+          agent: agents, // get the agent from the agents table from the db
+          duration: sql<number>`EXTRACT(EPOCH FROM(ended_at - started_at))`.as("duration"), // get the duration of the meeting in minutes
         })
-        .from(meetings)
+        .from(meetings) // this is the left table in the join 
+        .innerJoin(agents, eq(meetings.agentId, agents.id)) // join the meetings table with the agents table on the agentId column
         .where(
           // load meetings the user created
           and(
@@ -136,6 +142,7 @@ export const meetingsRouter = createTRPCRouter({
       const [totalCount] = await db
         .select({ count: count() })
         .from(meetings)
+        .innerJoin(agents, eq(meetings.agentId, agents.id))
         .where(
           and(
             eq(meetings.userId, ctx.session.user.id),

@@ -25,6 +25,11 @@ import type { AppRouter } from "@/trpc/routers/_app";
 export type AgentGetOne = inferRouterOutputs<AppRouter>["agents"]["getOneAgent"]; 
 
 
+// type for the return value of the getAllAgents tRPC procedure
+export type AgentGetAll = inferRouterOutputs<AppRouter>["agents"]["getAllAgents"]["items"][number]; 
+
+
+
 
 
 

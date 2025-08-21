@@ -16,8 +16,6 @@ import { TRPCError } from "@trpc/server";
 
 
 
-
-export const agentsRouter = createTRPCRouter({
   /**
    * Retrieves a single agent by its ID for the authenticated user.
    *
@@ -34,6 +32,8 @@ export const agentsRouter = createTRPCRouter({
    *   - Only agents belonging to the authenticated user can be retrieved.
    *   - The meetingCount field is currently a placeholder and should be replaced with the actual meeting count.
    */
+export const agentsRouter = createTRPCRouter({
+
   getOneAgent: protectedProcedure
     .input(z.object({ id: z.string() })) // input is the id of the agent
     .query(async ({ input, ctx }) => {
@@ -79,7 +79,7 @@ export const agentsRouter = createTRPCRouter({
    *   - The meetingCount field is currently a placeholder and should be replaced with the actual meeting count.
    */
   getAllAgents: protectedProcedure
-    .input(
+    .input( 
       z.object({
         page: z.number().default(DEFAULT_PAGE),
         pageSize: z
@@ -92,6 +92,7 @@ export const agentsRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const { page, pageSize, search } = input;
+      
       const data = await db
         .select({
           // TODO: Get the actual meeting count from the database

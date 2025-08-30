@@ -77,7 +77,6 @@ export const MeetingIdView = ({ meetingId }: Props) => {
           onEdit={() => setUpdateDialogOpen(true)}
           onRemove={handleRemoveMeeting}
         />
-        <h2>the status is {meeting.status}</h2>
         {isCancelled && <CancelledState />}
         {isProcessing && <ProcessingState />}
 

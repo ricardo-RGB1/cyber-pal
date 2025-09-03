@@ -18,3 +18,13 @@ export enum MeetingStatus {
     Completed = "completed",
     Cancelled = "cancelled",
 }
+
+
+// These types come directly from the transcriptUrl ex: {"speaker_id": "1", "type": "text", "text": "Hello, how are you?", "start_ts": 0, "stop_ts": 1000}
+export type StreamTranscriptItem = {
+    speaker_id: string; 
+    type: string; 
+    text: string; 
+    start_ts: number;  
+    stop_ts: number;   
+}

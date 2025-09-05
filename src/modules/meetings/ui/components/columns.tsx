@@ -1,7 +1,6 @@
 "use client";
 
 import { format } from "date-fns";
-import humanDuration from "humanize-duration";
 import { ColumnDef } from "@tanstack/react-table";
 import { GeneratedAvatar } from "@/components/generated-avatar";
 import {
@@ -16,19 +15,13 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { VideoIcon } from "lucide-react";
 import { MeetingGetAll } from "@/modules/meetings/types";
+import { formatMeetingDuration } from "@/lib/utils";
 
 
 
 
 
-const formatMeetingDuration = (durationInSeconds: number): string => {
-  const durationInMs = durationInSeconds * 1000;
-  return humanDuration(durationInMs, {
-    round: true,
-    largest: 2,
-    units: ["h", "m", "s"],
-  });
-};
+
 
 const statusIconMap = {
   upcoming: ClockArrowUpIcon,

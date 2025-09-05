@@ -1,7 +1,8 @@
 import { db } from "@/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { agents, meetings } from "@/db/schema";
+import { agents, meetings, user } from "@/db/schema";
 import { z } from "zod";
+import JSONL from "jsonl-parse-stringify";
 import {
   and,
   count,
@@ -11,6 +12,7 @@ import {
   ilike,
   min,
   sql,
+  inArray,
 } from "drizzle-orm";
 import {
   DEFAULT_PAGE,
@@ -20,11 +22,158 @@ import {
 } from "@/constants";
 import { TRPCError } from "@trpc/server";
 import { meetingsInsertSchema, meetingsUpdateSchema } from "../schemas";
-import { MeetingStatus } from "../types";
+import { MeetingStatus, StreamTranscriptItem } from "../types";
 import { streamClient } from "@/lib/stream-video";
 import { generateAvatarUri } from "@/lib/avatar";
+import { streamChat } from "@/lib/stream-chat";
+
+
+
+
+
+
 
 export const meetingsRouter = createTRPCRouter({
+  
+  /**
+   * generateChatToken - Generates a chat token for the authenticated user
+   * 
+   * This procedure generates a chat token for the authenticated user using the Stream Chat API.
+   * 
+   * @returns The generated chat token
+   */
+  generateChatToken: protectedProcedure.mutation(async ({ctx}) => { 
+    const token = streamChat.createToken(ctx.session.user.id);
+    await streamChat.upsertUser({
+      id: ctx.session.user.id, 
+      role: "admin", 
+    });
+
+    return token;
+  }),
+
+  /**
+   * getTranscript - Retrieves and enriches meeting transcript data
+   * 
+   * This procedure fetches a meeting transcript from a stored URL and enriches it with
+   * speaker information (names and avatars) from both users and agents tables.
+   * 
+   * @param input.id - The meeting ID to fetch the transcript for
+   * @returns Array of transcript items with speaker information, or empty array if no transcript
+   * 
+   * Process:
+   * 1. Validates meeting exists and belongs to authenticated user
+   * 2. Returns empty array if no transcript URL is stored
+   * 3. Fetches and parses JSONL transcript from the stored URL
+   * 4. Collects unique speaker IDs from transcript items
+   * 5. Fetches speaker details from users and agents tables
+   * 6. Enriches transcript items with speaker names and avatars
+   * 7. Handles unknown speakers with fallback information
+   */
+  getTranscript: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input, ctx }) => {
+      // Step 1: Verify meeting exists and belongs to the authenticated user
+      const [existingMeeting] = await db
+        .select()
+        .from(meetings)
+        .where(
+          and(
+            eq(meetings.id, input.id), // check if the meeting exists
+            eq(meetings.userId, ctx.session.user.id) // check if the meeting belongs to the user
+          )
+        );
+
+      if (!existingMeeting) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Meeting not found",
+        });
+      }
+
+      // Step 2: Return empty array if no transcript URL is available
+      if (!existingMeeting.transcriptUrl) {
+        return [];
+      }
+
+      // Step 3: Fetch and parse the JSONL transcript from the stored URL
+      const transcript = await fetch(existingMeeting.transcriptUrl)
+        .then((res) => res.text())
+        .then((text) => JSONL.parse<StreamTranscriptItem>(text))
+        .catch((err) => {
+          // Return empty array if transcript parsing fails
+          return [];
+        });
+
+      // Step 4: Extract all unique speaker IDs from transcript items
+      const speakerIds = [
+        ...new Set(transcript.map((item) => item.speaker_id)),
+      ];
+
+      // Step 5: Fetch user details for speaker IDs from users table
+      const userSpeakers = await db
+        .select()
+        .from(user)
+        .where(inArray(user.id, speakerIds))
+        .then((users) =>
+          users.map((user) => ({
+            ...user,
+            // Generate avatar if user doesn't have one
+            image:
+              user.image ??
+              generateAvatarUri({ seed: user.name, variant: "initials" }),
+          }))
+        );
+
+      // Step 6: Fetch agent details for speaker IDs from agents table
+      const agentSpeakers = await db
+        .select()
+        .from(agents)
+        .where(inArray(agents.id, speakerIds))
+        .then((agents) =>
+          agents.map((agent) => ({
+            ...agent,
+            // Generate bot-style avatar for agents
+            image: generateAvatarUri({
+              seed: agent.name,
+              variant: "botttsNeutral",
+            }),
+          }))
+        );
+
+        // Step 7: Combine all speakers (users and agents) into single array
+        const speakers = [...userSpeakers, ...agentSpeakers]; 
+
+        // Step 8: Enrich transcript items with speaker information
+        const transcriptWithSpeakers = transcript.map((item) => {
+          // Find speaker details for current transcript item
+          const speaker = speakers.find(
+            (speaker) => speaker.id === item.speaker_id
+          );
+
+          // Handle unknown speakers with fallback information
+          if(!speaker) {
+            return {
+              ...item,
+              user: {
+                name: "Unknown Speaker",
+                image: generateAvatarUri({ seed: "Unknown Speaker", variant: "initials"}) 
+              },
+            };
+          } 
+
+          // Return transcript item with speaker details
+          return { 
+            ...item,
+            user: {
+              name: speaker.name, 
+              image: speaker.image,
+            },
+          }; 
+        })
+
+        return transcriptWithSpeakers; 
+    }),
   generateToken: protectedProcedure.mutation(async ({ ctx }) => {
     await streamClient.upsertUsers([
       // upsert the user into the stream database
@@ -100,19 +249,19 @@ export const meetingsRouter = createTRPCRouter({
 
   /**
    * Creates a new meeting with an associated agent and Stream video call.
-   * 
+   *
    * This procedure performs the following operations:
    * 1. Creates a meeting record in the database with the authenticated user as the owner
    * 2. Creates a corresponding Stream video call with recording and transcription enabled
    * 3. Validates that the specified agent exists in the database
    * 4. Registers the agent as a Stream user for video call participation
-   * 
+   *
    * @input meetingsInsertSchema - Meeting data including name, description, agentId, etc.
-   * 
+   *
    * @returns The created meeting object from the database
-   * 
+   *
    * @throws TRPCError with code "NOT_FOUND" if the specified agent doesn't exist
-   * 
+   *
    * @remarks
    * - The meeting is automatically associated with the authenticated user (ctx.session.user.id)
    * - Stream video call is configured with automatic recording (1080p quality) and transcription (English)
@@ -158,10 +307,10 @@ export const meetingsRouter = createTRPCRouter({
       });
 
       // Step 3: Validate that the specified agent exists in the database
-      const [existingAgent] = await db 
+      const [existingAgent] = await db
         .select()
         .from(agents)
-        .where(eq(agents.id, createdMeeting.agentId)); 
+        .where(eq(agents.id, createdMeeting.agentId));
 
       if (!existingAgent) {
         throw new TRPCError({
@@ -174,20 +323,20 @@ export const meetingsRouter = createTRPCRouter({
       // This allows the agent to join the video call and interact with participants
       await streamClient.upsertUsers([
         {
-          id: existingAgent.id, 
-          name: existingAgent.name, 
+          id: existingAgent.id,
+          name: existingAgent.name,
           role: "user",
           // Generate a consistent avatar for the agent based on their name
-          image: generateAvatarUri({ 
-            seed: existingAgent.name, 
-            variant: "botttsNeutral" 
+          image: generateAvatarUri({
+            seed: existingAgent.name,
+            variant: "botttsNeutral",
           }),
         },
       ]);
 
       return createdMeeting;
     }),
-    
+
   getOneMeeting: protectedProcedure
     .input(z.object({ id: z.string() })) // input is the id of the meeting
     .query(async ({ input, ctx }) => {

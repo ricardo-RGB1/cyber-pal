@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { createTRPCRouter, protectedProcedure, premiumProcedure } from "@/trpc/init";
 import { agents, meetings, user } from "@/db/schema";
 import { z } from "zod";
 import JSONL from "jsonl-parse-stringify";
@@ -16,7 +16,7 @@ import {
 } from "drizzle-orm";
 import {
   DEFAULT_PAGE,
-  DEFAULT_PAGE_SIZE,
+  DEFAULT_PAGE_SIZE, 
   MAX_PAGE_SIZE,
   MIN_PAGE_SIZE,
 } from "@/constants";
@@ -268,7 +268,7 @@ export const meetingsRouter = createTRPCRouter({
    * - The agent is upserted into Stream with a generated avatar for video call participation
    * - The Stream call ID matches the meeting ID for easy correlation
    */
-  createMeeting: protectedProcedure
+  createMeeting: premiumProcedure("meetings")
     .input(meetingsInsertSchema)
     .mutation(async ({ input, ctx }) => {
       // Step 1: Insert the new meeting record into the database

@@ -24,11 +24,12 @@ import { CommandSelect } from "@/components/command-select";
 import { GeneratedAvatar } from "@/components/generated-avatar";
 import { useState } from "react";
 import { NewAgentDialog } from "@/modules/agents/ui/components/new-agent-dialog";
+import { useRouter } from "next/navigation";
 
 
 
 interface Props {
-  onSuccess?: (id: string) => void;
+  onSuccess?: (id?: string) => void;
   onCancel?: () => void; // this is a callback function that is called when the cancel button is clicked 
   initialValues?: MeetingGetOne;  
   // The initialValues is optional because we want to be able to create a new agent or edit an existing one - they are grabbed from the API endpoint (modules/agents/types.ts) NOT from the database (schema.ts)
@@ -40,16 +41,60 @@ type MeetingFormData = z.infer<typeof meetingsInsertSchema>;
 
 
 
+/**
+ * MeetingForm Component
+ * 
+ * A comprehensive form component for creating and editing meetings in the system.
+ * This component handles both new meeting creation and existing meeting updates
+ * through a unified interface with agent selection capabilities.
+ * 
+ * Features:
+ * - Create new meetings or edit existing ones based on initialValues
+ * - Agent selection through searchable dropdown with avatar display
+ * - Integration with premium usage tracking for free tier limits
+ * - Real-time agent search with debounced queries
+ * - Inline agent creation through modal dialog
+ * - Optimistic UI updates with cache invalidation
+ * - Form validation using Zod schema
+ * 
+ * @param onSuccess - Callback function called with meeting ID upon successful submission
+ * @param onCancel - Optional callback for cancel button (shows button only if provided)
+ * @param initialValues - Optional meeting data for editing mode (triggers edit vs create)
+ * 
+ * @example
+ * ```tsx
+ * // Creating a new meeting
+ * <MeetingForm 
+ *   onSuccess={(id) => router.push(`/meetings/${id}`)}
+ *   onCancel={() => setDialogOpen(false)}
+ * />
+ * 
+ * // Editing existing meeting
+ * <MeetingForm
+ *   initialValues={meeting}
+ *   onSuccess={() => toast.success("Meeting updated")}
+ * />
+ * ```
+ * 
+ * @remarks
+ * - Form automatically detects edit mode when initialValues.id is present
+ * - Agent search is optimized with pagination (100 items max)
+ * - Cache invalidation ensures UI consistency across meeting lists and details
+ * - Premium usage cache is updated on successful meeting creation
+ * - Error handling includes premium limit enforcement (TODO: redirect to upgrade)
+ */
 export const MeetingForm = ({ onSuccess, onCancel, initialValues }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const [openNewAgentDialog, setOpenNewAgentDialog] = useState(false);
+  const [agentSearch, setAgentSearch] = useState("");
 
-  const [openNewAgentDialog, setOpenNewAgentDialog] = useState(false); // This is the state to open the command select dialog 
-  const [agentSearch, setAgentSearch] = useState(""); // This is the search string for the agents 
-
-  // Query to fetch agents for the command select dropdown
-  // Uses search functionality to filter agents based on user input
-  //  * This is basically a better search experience than using a dropdow Select because it allows you to search for agents by name *  
+  /**
+   * Query to fetch agents for the command select dropdown.
+   * Uses search functionality to filter agents based on user input
+   * for a better search experience than a standard dropdown.
+   */
   const agents = useQuery(
     trpc.agents.getAllAgents.queryOptions({ 
       pageSize: 100,
@@ -57,60 +102,78 @@ export const MeetingForm = ({ onSuccess, onCancel, initialValues }: Props) => {
     })
   );
 
-
-    // This is the mutation to create a meeting 
+  /**
+   * Mutation for creating new meetings.
+   * 
+   * On Success:
+   * - Invalidates meeting list cache for immediate UI updates
+   * - Invalidates premium usage cache to update free tier counts
+   * - Calls onSuccess callback with new meeting ID
+   * 
+   * On Error:
+   * - Displays error message via toast
+   * - TODO: Check for FORBIDDEN error and redirect to upgrade page
+   */
   const createMeeting = useMutation(
     trpc.meetings.createMeeting.mutationOptions({
-
       onSuccess: async (data) => { 
         await queryClient.invalidateQueries( 
           trpc.meetings.getAllMeetings.queryOptions({})
-        ); // This is to invalidate the cache of the meetings LIST so that the new meeting is displayed immediately 
+        );
 
-        if (initialValues?.id) {
-          await queryClient.invalidateQueries( 
-            trpc.meetings.getOneMeeting.queryOptions({ id: initialValues.id })
-          );
-        } // This is to invalidate the cache of the meeting DETAILS so that the new meeting is displayed immediately 
+        await queryClient.invalidateQueries(
+          trpc.premium.getFreeUsage.queryOptions()
+        );
 
-        onSuccess?.(data.id); // This is to call the onSuccess callback if it is provided 
+        onSuccess?.(data.id);
       },
       onError: (error) => {
         toast.error(error.message);
 
-        // TODO: Check if error code is 'FORBIDDEN' and if so, redirect to /upgrade
+        if (error.data?.code === "FORBIDDEN") {
+          router.push("/upgrade");
+        }
       },
     })
   );
 
-// This is the mutation to update a meeting 
+
+  /**
+   * Mutation for updating existing meetings.
+   * 
+   * On Success:
+   * - Invalidates meeting list cache for immediate UI updates
+   * - Invalidates specific meeting cache to refresh detail views
+   * - Calls onSuccess callback
+   * 
+   * On Error:
+   * - Displays error message via toast
+   */
   const updateMeeting = useMutation(
     trpc.meetings.update.mutationOptions({
-      onSuccess: async (data) => { 
+      onSuccess: async () => { 
         await queryClient.invalidateQueries(
           trpc.meetings.getAllMeetings.queryOptions({})
-        ); // This is to invalidate the cache of the meetings LIST so that the new meeting is displayed immediately 
+        );
 
-        // This is to invalidate the cache of the meeting DETAILS so that the new meeting is displayed immediately 
         if (initialValues?.id) {
           await queryClient.invalidateQueries(
             trpc.meetings.getOneMeeting.queryOptions({ id: initialValues.id })
           );
         } 
 
-       // TODO: Invalidate free tier usage 
-
-        onSuccess?.(data.id); 
+        onSuccess?.();
       },
       onError: (error) => {
         toast.error(error.message);
-
-        // TODO: Check if error code is 'FORBIDDEN' and if so, redirect to /upgrade
       },
     })
   );
 
-  // This is the form for the meeting  - the agentId is the id of the agent that is selected from the command select dropdown 
+  /**
+   * Form configuration using react-hook-form with Zod validation.
+   * Default values are populated from initialValues when editing.
+   */
   const form = useForm<MeetingFormData>({
     resolver: zodResolver(meetingsInsertSchema),
     defaultValues: {
@@ -119,22 +182,24 @@ export const MeetingForm = ({ onSuccess, onCancel, initialValues }: Props) => {
     },
   });
 
-  // If the initialValues has an id (a truthy value), then we are editing an existing meeting
+  // Determine if we're in edit mode based on presence of ID
   const isEdit = !!initialValues?.id; 
 
-  // This is to check if the meeting is being created or updated 
+  // Track pending state across both mutations
   const isPending = createMeeting.isPending || updateMeeting.isPending; 
 
-
-
+  /**
+   * Form submission handler that routes to appropriate mutation
+   * based on edit mode state.
+   */
   const onSubmit = (values: MeetingFormData) => {
     if (isEdit) { 
-      updateMeeting.mutate({ // This is to update an existing meeting when the form is submitted 
+      updateMeeting.mutate({
         ...values,
         id: initialValues.id,
       }); 
     } else {
-      createMeeting.mutate(values); // This is to create a new meeting when the form is submitted 
+      createMeeting.mutate(values);
     }
   };
 
@@ -203,7 +268,7 @@ export const MeetingForm = ({ onSuccess, onCancel, initialValues }: Props) => {
         />
 
         <div className="flex justify-end gap-x-2">
-          {onCancel && ( // This is to show the cancel button if the onCancel prop is provided 
+          {onCancel && (
             <Button
               variant="ghost"
               disabled={isPending}

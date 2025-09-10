@@ -22,12 +22,48 @@ interface Props {
   agentId: string;
 }
 
+
+
+
+/**
+ * AgentIdView Component
+ * 
+ * A detailed view component for displaying and managing a single AI agent. This component
+ * provides a comprehensive interface for viewing agent details, editing agent properties,
+ * and removing agents from the system.
+ * 
+ * Features:
+ * - Displays agent information including name, avatar, instructions, and meeting count
+ * - Provides edit functionality through a modal dialog
+ * - Handles agent deletion with confirmation dialog and cascade cleanup
+ * - Real-time data updates through optimistic UI patterns
+ * - Automatic navigation and cache invalidation after mutations
+ * 
+ * The component uses Suspense for data fetching and handles loading/error states
+ * through separate exported components. It integrates with the premium system
+ * to update usage counts when agents are deleted.
+ * 
+ * @param agentId - The unique identifier of the agent to display
+ * 
+ * @example
+ * ```tsx
+ * // In a page component with Suspense boundary
+ * <Suspense fallback={<AgentIDViewLoading />}>
+ *   <AgentIdView agentId="agent-123" />
+ * </Suspense>
+ * ```
+ * 
+ * @remarks
+ * - Requires Suspense boundary for proper data loading
+ * - Automatically redirects to /agents after successful deletion
+ * - Updates both agent list and premium usage caches on deletion
+ * - Shows meeting count affected by deletion in confirmation dialog
+ */
 export const AgentIdView = ({ agentId }: Props) => {
   const router = useRouter();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const [updateAgentDialogOpen, setUpdateAgentDialogOpen] = useState(false); 
-
 
   
   const { data } = useSuspenseQuery( 
@@ -35,15 +71,24 @@ export const AgentIdView = ({ agentId }: Props) => {
   );
 
   /**
-   * This hook  sets up a mutation for removing an agent.
-   *   (useMutation is a hook that allows us to mutate the data in the database)
-   *
-   * - When the mutation succeeds:
-   *   - It invalidates the cached list of all agents, so the UI will refetch and update.
-   *   - It then navigates the user back to the main agents page.
-   *
-   * - If the mutation fails:
-   *   - It displays an error toast with the error message.
+   * Mutation hook for removing an agent and its associated data.
+   * 
+   * This mutation handles the complete removal of an agent from the system,
+   * including cleanup of associated meetings and cache invalidation.
+   * 
+   * On Success:
+   * - Invalidates the agents list cache to remove the deleted agent from lists
+   * - Invalidates premium usage cache to update free tier usage counts
+   * - Redirects user to the main agents page
+   * 
+   * On Error:
+   * - Displays error message via toast notification
+   * - Preserves current page state for user to retry
+   * 
+   * @remarks
+   * - Uses mutateAsync for imperative execution after confirmation
+   * - Cache invalidation ensures UI consistency across the application
+   * - Navigation occurs after cache updates to prevent stale data display
    */
   const removeAgent = useMutation(
     trpc.agents.remove.mutationOptions({
@@ -51,7 +96,9 @@ export const AgentIdView = ({ agentId }: Props) => {
         await queryClient.invalidateQueries(
           trpc.agents.getAllAgents.queryOptions({})
         );
-        // TODO: Invalidate free tier usage
+        await queryClient.invalidateQueries(
+          trpc.premium.getFreeUsage.queryOptions()
+        );
         router.push("/agents"); // push after the function invalidates the agents list
       },
       onError: (error) => {
@@ -60,11 +107,33 @@ export const AgentIdView = ({ agentId }: Props) => {
     })
   );
 
+  /**
+   * Confirmation dialog hook for agent deletion.
+   * 
+   * Creates a reusable confirmation dialog that warns users about the consequences
+   * of deleting an agent, specifically mentioning the number of associated meetings
+   * that will also be removed.
+   * 
+   * @returns [ConfirmDialog, confirm] - Dialog component and confirmation function
+   */
   const [ConfirmDialog, confirm] = useConfirm(
     "Delete agent. Are you sure?",
     `The following action will remove ${data.meetingCount} associated meetings`, 
   );
 
+  /**
+   * Handles the agent removal process with user confirmation.
+   * 
+   * This function orchestrates the deletion workflow:
+   * 1. Shows confirmation dialog to user
+   * 2. If confirmed, executes the remove mutation
+   * 3. Mutation handles navigation and cache updates
+   * 
+   * @remarks
+   * - Uses async/await pattern for proper error handling
+   * - Early return prevents execution if user cancels
+   * - mutateAsync allows for imperative control flow
+   */
   const handleRemove = async () => {
     const confirmed = await confirm();
     if (!confirmed) return;

@@ -25,6 +25,42 @@ interface Props  {
   meetingId: string;
 }
 
+/**
+ * MeetingIdView Component
+ * 
+ * A comprehensive view component for displaying and managing a single meeting. This component
+ * provides a detailed interface for viewing meeting information, editing meeting properties,
+ * and managing meeting lifecycle operations including removal.
+ * 
+ * Features:
+ * - Displays meeting details with dynamic status-based rendering
+ * - Provides edit functionality through a modal dialog
+ * - Handles meeting deletion with confirmation dialog and cascade cleanup
+ * - Real-time data updates through optimistic UI patterns
+ * - Automatic navigation and cache invalidation after mutations
+ * - Status-specific UI components for different meeting states
+ * 
+ * The component uses Suspense for data fetching and handles loading/error states
+ * through separate exported components. It integrates with the premium system
+ * to update usage counts when meetings are deleted.
+ * 
+ * @param meetingId - The unique identifier of the meeting to display
+ * 
+ * @example
+ * ```tsx
+ * // In a page component with Suspense boundary
+ * <Suspense fallback={<MeetingIdViewLoading />}>
+ *   <MeetingIdView meetingId="meeting-123" />
+ * </Suspense>
+ * ```
+ * 
+ * @remarks
+ * - Requires Suspense boundary for proper data loading
+ * - Automatically redirects to /meetings after successful deletion
+ * - Updates both meeting list and premium usage caches on deletion
+ * - Renders different UI components based on meeting status (upcoming, active, completed, etc.)
+ * - Handles all meeting lifecycle states: upcoming, active, processing, completed, cancelled
+ */
 export const MeetingIdView = ({ meetingId }: Props) => {
   const router = useRouter();
   const trpc = useTRPC();
@@ -35,32 +71,87 @@ export const MeetingIdView = ({ meetingId }: Props) => {
     trpc.meetings.getOneMeeting.queryOptions({ id: meetingId })
   );
 
+  /**
+   * Confirmation dialog hook for meeting deletion.
+   * 
+   * Creates a reusable confirmation dialog with predefined title and message
+   * for meeting removal operations. The dialog ensures user intent before
+   * proceeding with destructive operations.
+   */
   const [ConfirmDialog, confirm] = useConfirm(
     "Remove Meeting",
     "Are you sure you want to remove this meeting?"
   );
 
+  /**
+   * Mutation hook for removing a meeting and its associated data.
+   * 
+   * This mutation handles the complete removal of a meeting from the system,
+   * including cleanup of associated data and cache invalidation.
+   * 
+   * On Success:
+   * - Invalidates the meetings list cache to remove the deleted meeting from lists
+   * - Invalidates premium usage cache to update free tier usage counts
+   * - Redirects user to the main meetings page
+   * 
+   * On Error:
+   * - Error handling is managed by the tRPC mutation error system
+   * - UI remains in current state for user to retry operation
+   * 
+   * @remarks
+   * - Uses mutateAsync for imperative execution after confirmation
+   * - Cache invalidation ensures UI consistency across the application
+   * - Navigation occurs after cache updates to prevent stale data display
+   */
   const removeMeeting = useMutation(
     trpc.meetings.remove.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries(
+      onSuccess: async () => {
+        await queryClient.invalidateQueries(
           trpc.meetings.getAllMeetings.queryOptions({})
         );
-        // TODO: Invalidate FREE TIER usage
+        await queryClient.invalidateQueries(
+          trpc.premium.getFreeUsage.queryOptions()
+        );
         router.push("/meetings");
       },
     })
   );
 
+  /**
+   * Handler function for meeting removal operation.
+   * 
+   * Orchestrates the meeting deletion process by first showing a confirmation
+   * dialog and then executing the removal mutation if confirmed. This provides
+   * a safe deletion workflow with user confirmation.
+   * 
+   * @remarks
+   * - Returns early if user cancels the confirmation dialog
+   * - Uses mutateAsync to handle the asynchronous deletion operation
+   * - Deletion includes automatic cache invalidation and navigation
+   */
   const handleRemoveMeeting = async () => {
     const ok = await confirm();
 
     if (!ok) return;
-    await removeMeeting.mutateAsync({ id: meetingId }); // This will trigger the onSuccess callback
+    await removeMeeting.mutateAsync({ id: meetingId }); 
   };
 
   
-  // Determine meeting state for conditional rendering
+  /**
+   * Determine meeting state for conditional rendering
+   * 
+   * These boolean flags are used to conditionally render different UI components
+   * based on the current status of the meeting. Each status corresponds to a
+   * specific UI component that handles the display and interactions appropriate
+   * for that meeting state.
+   * 
+   * Meeting States:
+   * - upcoming: Meeting is scheduled but not yet started
+   * - active: Meeting is currently in progress
+   * - processing: Meeting has ended and is being processed
+   * - completed: Meeting processing is complete with results available
+   * - cancelled: Meeting was cancelled before completion
+   */
   const isActive = meeting.status === "active";
   const isCompleted = meeting.status === "completed";
   const isCancelled = meeting.status === "cancelled";

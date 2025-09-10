@@ -2,25 +2,48 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@/db";
 import * as schema from "@/db/schema"; // import the schema
+import { polar, checkout, portal } from "@polar-sh/better-auth"; 
+import { polarClient } from "./polar";  // import the polar client   
 
+    
 
-
-
+ 
 /**
- * The `auth` object is the main authentication handler for the application.
+ * Authentication configuration for the application using Better Auth.
  * 
- * It is configured with:
- * - Social providers (GitHub and Google) for OAuth sign-in.
- * - Email and password authentication.
- * - A Drizzle ORM adapter for database persistence, using the provided schema.
+ * This configuration sets up a comprehensive authentication system with:
+ * - Social providers (GitHub, Google)
+ * - Email/password authentication
+ * - Polar integration for subscription management
+ * - Drizzle ORM database adapter for PostgreSQL
  * 
- * Environment variables are used to securely provide OAuth client credentials.
+ * Features:
+ * - Automatic customer creation in Polar on user signup
+ * - Authenticated-only checkout flow with upgrade redirection
+ * - Customer portal access for subscription management
+ * - Multi-provider social authentication
+ * - Traditional email/password authentication
  * 
- * Usage:
- *   - `auth.api.getSession()` to retrieve the current session (server-side).
- *   - `authClient` (see `@/lib/auth-client`) for client-side authentication actions.
+ * @remarks
+ * - Requires GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET environment variables
+ * - Requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables
+ * - Uses PostgreSQL database with Drizzle ORM for data persistence
+ * - Integrates with Polar for subscription and billing management
  */
 export const auth = betterAuth({
+    plugins: [ 
+        polar({
+            client: polarClient, 
+            createCustomerOnSignUp: true,  // this will create a customer in the polar database when the user signs up
+            use: [
+                checkout({
+                    authenticatedUsersOnly: true,  // this will only allow authenticated users to checkout
+                    successUrl: "/upgrade",
+                }),
+                portal(), // this will allow the user to manage their subscription in the polar portal
+            ]
+        }),
+    ], 
     socialProviders: {
         github: { 
             clientId: process.env.GITHUB_CLIENT_ID as string, 

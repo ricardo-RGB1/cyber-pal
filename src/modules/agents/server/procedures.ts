@@ -1,6 +1,10 @@
 import { db } from "@/db";
-import { createTRPCRouter, protectedProcedure, premiumProcedure } from "@/trpc/init";
-import { agents } from "@/db/schema";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  premiumProcedure,
+} from "@/trpc/init";
+import { agents, meetings } from "@/db/schema";
 import { z } from "zod";
 import { agentsUpdateSchema, agentsInsertSchema } from "../schemas";
 import { and, count, desc, eq, getTableColumns, ilike, sql } from "drizzle-orm";
@@ -12,36 +16,31 @@ import {
 } from "@/constants";
 import { TRPCError } from "@trpc/server";
 
-
-
-
-
-  /**
-   * Retrieves a single agent by its ID for the authenticated user.
-   *
-   * @input
-   *   - id: The ID of the agent to retrieve.
-   *
-   * @returns
-   *   - An agent object containing all columns from the agents table, plus a placeholder meetingCount.
-   *
-   * @throws
-   *   - TRPCError with code "NOT_FOUND" if the agent does not exist or does not belong to the user.
-   *
-   * @remarks
-   *   - Only agents belonging to the authenticated user can be retrieved.
-   *   - The meetingCount field is currently a placeholder and should be replaced with the actual meeting count.
-   */
+/**
+ * Retrieves a single agent by its ID for the authenticated user.
+ *
+ * @input
+ *   - id: The ID of the agent to retrieve.
+ *
+ * @returns
+ *   - An agent object containing all columns from the agents table, plus a placeholder meetingCount.
+ *
+ * @throws
+ *   - TRPCError with code "NOT_FOUND" if the agent does not exist or does not belong to the user.
+ *
+ * @remarks
+ *   - Only agents belonging to the authenticated user can be retrieved.
+ *   - The meetingCount field is currently a placeholder and should be replaced with the actual meeting count.
+ */
 export const agentsRouter = createTRPCRouter({
-
   getOneAgent: protectedProcedure
     .input(z.object({ id: z.string() })) // input is the id of the agent
     .query(async ({ input, ctx }) => {
       const [existingAgent] = await db
         .select({
-          // TODO: Get the actual meeting count from the database
-          meetingCount: sql<number>`5`,
           ...getTableColumns(agents),
+          // select the agent and the count of meetings for the agent
+          meetingCount: db.$count(meetings, eq(agents.id, meetings.agentId)),
         })
         .from(agents)
         .where(
@@ -79,7 +78,7 @@ export const agentsRouter = createTRPCRouter({
    *   - The meetingCount field is currently a placeholder and should be replaced with the actual meeting count.
    */
   getAllAgents: protectedProcedure
-    .input( 
+    .input(
       z.object({
         page: z.number().default(DEFAULT_PAGE),
         pageSize: z
@@ -92,12 +91,11 @@ export const agentsRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const { page, pageSize, search } = input;
-      
+
       const data = await db
-        .select({
-          // TODO: Get the actual meeting count from the database
-          meetingCount: sql<number>`1`,
+        .select({ // select the agent and the count of meetings for the agent
           ...getTableColumns(agents),
+          meetingCount: db.$count(meetings, eq(agents.id, meetings.agentId)),
         })
         .from(agents)
         .where(
@@ -157,7 +155,7 @@ export const agentsRouter = createTRPCRouter({
    * ```
    */
   createAgent: premiumProcedure("agents")
-    .input(agentsInsertSchema) 
+    .input(agentsInsertSchema)
     .mutation(async ({ input, ctx }) => {
       // Insert the new agent into the database with the user's ID
       const [createdAgent] = await db
@@ -247,22 +245,24 @@ export const agentsRouter = createTRPCRouter({
    * ```typescript
    * // Update only the name
    * update({ id: "agent_123", name: "New Agent Name" })
-   * 
+   *
    * // Update both name and instructions
-   * update({ 
-   *   id: "agent_123", 
-   *   name: "Customer Support Bot", 
-   *   instructions: "Updated instructions for handling customer queries" 
+   * update({
+   *   id: "agent_123",
+   *   name: "Customer Support Bot",
+   *   instructions: "Updated instructions for handling customer queries"
    * })
    * ```
    */
-  update: protectedProcedure 
+  update: protectedProcedure
     .input(agentsUpdateSchema) // input is the id of the agent to update and the name and instructions of the agent
-    .mutation(async ({ input, ctx }) => { 
-      const [updatedAgent] = await db  // updatedAgent is the agent that was updated
-        .update(agents) 
+    .mutation(async ({ input, ctx }) => {
+      const [updatedAgent] = await db // updatedAgent is the agent that was updated
+        .update(agents)
         .set(input) // set the input to the agents table
-        .where(and(eq(agents.id, input.id), eq(agents.userId, ctx.session.user.id))) // where the id of the agent is the same as the id of the agent in the input and the user id is the same as the user id in the context
+        .where(
+          and(eq(agents.id, input.id), eq(agents.userId, ctx.session.user.id))
+        ) // where the id of the agent is the same as the id of the agent in the input and the user id is the same as the user id in the context
         .returning();
 
       if (!updatedAgent) {

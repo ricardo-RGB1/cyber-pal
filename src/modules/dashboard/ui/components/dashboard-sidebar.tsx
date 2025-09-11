@@ -21,7 +21,6 @@ import { usePathname } from "next/navigation";
 import { DashboardTrial } from "./dashboard-trial";
 import { DashboardUserButton } from "./dashboard-user-button";
 
-
 const firstSection = [
   {
     icon: VideoIcon,
@@ -35,8 +34,6 @@ const firstSection = [
   },
 ];
 
-
-
 const secondSection = [
   {
     icon: StarIcon,
@@ -47,7 +44,7 @@ const secondSection = [
 
 export const DashboardSidebar = () => {
   const pathname = usePathname();
-  
+
   return (
     <Sidebar>
       <SidebarHeader className="text-shadow-accent-foreground">
@@ -87,8 +84,8 @@ export const DashboardSidebar = () => {
           </SidebarGroupContent>
         </SidebarGroup>
         <div className="px-4 py-2">
-        <Separator className="opacity-10 text-[#5D6b68]" />
-         </div>
+          <Separator className="opacity-10 text-[#5D6b68]" />
+        </div>
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -117,8 +114,8 @@ export const DashboardSidebar = () => {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="text-white">
-        <DashboardTrial /> 
-        <DashboardUserButton /> 
+        <DashboardTrial />
+        <DashboardUserButton />
       </SidebarFooter>
     </Sidebar>
   );

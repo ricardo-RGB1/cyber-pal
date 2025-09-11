@@ -4,7 +4,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { OctagonAlertIcon } from "lucide-react";
-import { FaGithub, FaGoogle } from "react-icons/fa"; 
+import { FaGithub, FaGoogle } from "react-icons/fa";
 // local imports
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,25 +23,16 @@ import { authClient } from "@/lib/auth-client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-
-
-
-
 // form schema - no min required when logging in
 const formSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1, { message: "Password is required" }),
 });
 
-
-
-
-
-
 export const SignInView = () => {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const router = useRouter(); 
+  const router = useRouter();
   // form hook - used to handle the form state and validation
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -66,16 +57,16 @@ export const SignInView = () => {
   const onSubmit = (data: z.infer<typeof formSchema>) => {
     setError(null);
     setPending(true);
-    authClient.signIn.email( 
+    authClient.signIn.email(
       {
         email: data.email,
         password: data.password,
-        callbackURL: "/", 
+        callbackURL: "/",
       },
       {
         onSuccess: () => {
           setPending(false);
-          router.push("/"); 
+          router.push("/");
         },
         onError: ({ error }) => {
           setPending(false);
@@ -92,28 +83,28 @@ export const SignInView = () => {
    * Handles social sign-in (Google or GitHub).
    *
    */
-    const onSocial = (provider: "google" | "github") => {
-      setError(null);
-      setPending(true);
-      authClient.signIn.social(
-        {
-          provider,
-          callbackURL: "/",
+  const onSocial = (provider: "google" | "github") => {
+    setError(null);
+    setPending(true);
+    authClient.signIn.social(
+      {
+        provider,
+        callbackURL: "/",
+      },
+      {
+        onSuccess: () => {
+          setPending(false);
         },
-        {
-          onSuccess: () => {
-            setPending(false);
-          },
-          onError: ({ error }) => {
-            setPending(false);
-            setError(error.message);
-          },
-          onSettled: () => {
-            setPending(false);
-          },
-        }
-      );
-    };
+        onError: ({ error }) => {
+          setPending(false);
+          setError(error.message);
+        },
+        onSettled: () => {
+          setPending(false);
+        },
+      }
+    );
+  };
 
   return (
     <div className="flex flex-col gap-6">

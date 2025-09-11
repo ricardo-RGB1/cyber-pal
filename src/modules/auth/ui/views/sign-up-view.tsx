@@ -4,7 +4,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { OctagonAlertIcon } from "lucide-react";
-import { FaGithub, FaGoogle } from "react-icons/fa"; 
+import { FaGithub, FaGoogle } from "react-icons/fa";
 // local imports
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -38,10 +38,8 @@ const formSchema = z
     message: "Passwords do not match",
   });
 
-
-  
 export const SignUpView = () => {
-  const router = useRouter(); 
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -85,7 +83,7 @@ export const SignUpView = () => {
       {
         onSuccess: () => {
           setPending(false);
-          router.push("/"); 
+          router.push("/");
         },
         onError: ({ error }) => {
           setPending(false);
@@ -185,7 +183,7 @@ export const SignUpView = () => {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                        <Input
+                          <Input
                             type="password"
                             placeholder="********"
                             {...field}

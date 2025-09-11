@@ -386,14 +386,14 @@ export const meetingsRouter = createTRPCRouter({
    */
   getAllMeetings: protectedProcedure
     .input(
-      z.object({
+      z.object({ 
         page: z.number().default(DEFAULT_PAGE),
         pageSize: z
           .number()
           .min(MIN_PAGE_SIZE)
           .max(MAX_PAGE_SIZE)
           .default(DEFAULT_PAGE_SIZE),
-        search: z.string().nullish(),
+        search: z.string().nullish(), // search is the search string to filter meetings by name (case-insensitive, partial match)
         agentId: z.string().nullish(), // agentId is the id of the agent to filter meetings by
         status: z
           .enum([

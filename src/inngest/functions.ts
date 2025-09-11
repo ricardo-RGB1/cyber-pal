@@ -6,13 +6,6 @@ import { agents, meetings, user } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { createAgent, openai, TextMessage } from "@inngest/agent-kit";
 
-
-
-
-
-
-
-
 const summarizerAgent = createAgent({
   name: "summarizer",
   system:

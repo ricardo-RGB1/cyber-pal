@@ -7,7 +7,7 @@ import {
 import { agents, meetings } from "@/db/schema";
 import { z } from "zod";
 import { agentsUpdateSchema, agentsInsertSchema } from "../schemas";
-import { and, count, desc, eq, getTableColumns, ilike, sql } from "drizzle-orm";
+import { and, count, desc, eq, getTableColumns, ilike } from "drizzle-orm";
 import {
   DEFAULT_PAGE,
   DEFAULT_PAGE_SIZE,
@@ -93,7 +93,8 @@ export const agentsRouter = createTRPCRouter({
       const { page, pageSize, search } = input;
 
       const data = await db
-        .select({ // select the agent and the count of meetings for the agent
+        .select({
+          // select the agent and the count of meetings for the agent
           ...getTableColumns(agents),
           meetingCount: db.$count(meetings, eq(agents.id, meetings.agentId)),
         })

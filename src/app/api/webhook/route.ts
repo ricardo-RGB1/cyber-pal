@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
   let payload: unknown;
   try {
     payload = JSON.parse(bodyOfSignature) as Record<string, unknown>;
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
@@ -270,7 +270,7 @@ export async function POST(request: NextRequest) {
     }
 
     // if the user id is not the same as the agent id, then we need to send the AI response back to the chat channel because the user is asking a question to the agent.
-    if (userId !== existingAgent.id) { 
+    if (userId !== existingAgent.id) {
       const instructions = `
             You are an AI assistant helping the user revisit a recently completed meeting.
             Below is a summary of the meeting, generated from the transcript:

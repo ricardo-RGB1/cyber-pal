@@ -1,5 +1,9 @@
 import { db } from "@/db";
-import { createTRPCRouter, protectedProcedure, premiumProcedure } from "@/trpc/init";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  premiumProcedure,
+} from "@/trpc/init";
 import { agents, meetings, user } from "@/db/schema";
 import { z } from "zod";
 import JSONL from "jsonl-parse-stringify";
@@ -10,13 +14,12 @@ import {
   eq,
   getTableColumns,
   ilike,
-  min,
   sql,
   inArray,
 } from "drizzle-orm";
 import {
   DEFAULT_PAGE,
-  DEFAULT_PAGE_SIZE, 
+  DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
   MIN_PAGE_SIZE,
 } from "@/constants";
@@ -27,26 +30,19 @@ import { streamClient } from "@/lib/stream-video";
 import { generateAvatarUri } from "@/lib/avatar";
 import { streamChat } from "@/lib/stream-chat";
 
-
-
-
-
-
-
 export const meetingsRouter = createTRPCRouter({
-  
   /**
    * generateChatToken - Generates a chat token for the authenticated user
-   * 
+   *
    * This procedure generates a chat token for the authenticated user using the Stream Chat API.
-   * 
+   *
    * @returns The generated chat token
    */
-  generateChatToken: protectedProcedure.mutation(async ({ctx}) => { 
+  generateChatToken: protectedProcedure.mutation(async ({ ctx }) => {
     const token = streamChat.createToken(ctx.session.user.id);
     await streamChat.upsertUser({
-      id: ctx.session.user.id, 
-      role: "admin", 
+      id: ctx.session.user.id,
+      role: "admin",
     });
 
     return token;
@@ -54,13 +50,13 @@ export const meetingsRouter = createTRPCRouter({
 
   /**
    * getTranscript - Retrieves and enriches meeting transcript data
-   * 
+   *
    * This procedure fetches a meeting transcript from a stored URL and enriches it with
    * speaker information (names and avatars) from both users and agents tables.
-   * 
+   *
    * @param input.id - The meeting ID to fetch the transcript for
    * @returns Array of transcript items with speaker information, or empty array if no transcript
-   * 
+   *
    * Process:
    * 1. Validates meeting exists and belongs to authenticated user
    * 2. Returns empty array if no transcript URL is stored
@@ -100,7 +96,7 @@ export const meetingsRouter = createTRPCRouter({
       const transcript = await fetch(existingMeeting.transcriptUrl)
         .then((res) => res.text())
         .then((text) => JSONL.parse<StreamTranscriptItem>(text))
-        .catch((err) => {
+        .catch(() => {
           // Return empty array if transcript parsing fails
           return [];
         });
@@ -141,38 +137,41 @@ export const meetingsRouter = createTRPCRouter({
           }))
         );
 
-        // Step 7: Combine all speakers (users and agents) into single array
-        const speakers = [...userSpeakers, ...agentSpeakers]; 
+      // Step 7: Combine all speakers (users and agents) into single array
+      const speakers = [...userSpeakers, ...agentSpeakers];
 
-        // Step 8: Enrich transcript items with speaker information
-        const transcriptWithSpeakers = transcript.map((item) => {
-          // Find speaker details for current transcript item
-          const speaker = speakers.find(
-            (speaker) => speaker.id === item.speaker_id
-          );
+      // Step 8: Enrich transcript items with speaker information
+      const transcriptWithSpeakers = transcript.map((item) => {
+        // Find speaker details for current transcript item
+        const speaker = speakers.find(
+          (speaker) => speaker.id === item.speaker_id
+        );
 
-          // Handle unknown speakers with fallback information
-          if(!speaker) {
-            return {
-              ...item,
-              user: {
-                name: "Unknown Speaker",
-                image: generateAvatarUri({ seed: "Unknown Speaker", variant: "initials"}) 
-              },
-            };
-          } 
-
-          // Return transcript item with speaker details
-          return { 
+        // Handle unknown speakers with fallback information
+        if (!speaker) {
+          return {
             ...item,
             user: {
-              name: speaker.name, 
-              image: speaker.image,
+              name: "Unknown Speaker",
+              image: generateAvatarUri({
+                seed: "Unknown Speaker",
+                variant: "initials",
+              }),
             },
-          }; 
-        })
+          };
+        }
 
-        return transcriptWithSpeakers; 
+        // Return transcript item with speaker details
+        return {
+          ...item,
+          user: {
+            name: speaker.name,
+            image: speaker.image,
+          },
+        };
+      });
+
+      return transcriptWithSpeakers;
     }),
   generateToken: protectedProcedure.mutation(async ({ ctx }) => {
     await streamClient.upsertUsers([
@@ -386,7 +385,7 @@ export const meetingsRouter = createTRPCRouter({
    */
   getAllMeetings: protectedProcedure
     .input(
-      z.object({ 
+      z.object({
         page: z.number().default(DEFAULT_PAGE),
         pageSize: z
           .number()

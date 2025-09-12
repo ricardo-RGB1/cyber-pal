@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { VideoIcon } from "lucide-react";
 import { MeetingGetAll } from "@/modules/meetings/types";
 import { formatMeetingDuration } from "@/lib/utils";
 
